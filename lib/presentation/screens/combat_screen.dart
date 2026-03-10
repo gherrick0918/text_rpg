@@ -8,6 +8,7 @@ import '../widgets/parchment_panel.dart';
 import '../widgets/stat_bar.dart';
 import '../widgets/action_button.dart';
 import '../widgets/divider_ornament.dart';
+import 'combat_victory_screen.dart';
 import 'level_up_screen.dart';
 import 'game_over_screen.dart';
 
@@ -43,26 +44,27 @@ class _CombatScreenState extends ConsumerState<CombatScreen> {
   Widget build(BuildContext context) {
     final campaign = ref.watch(campaignProvider);
 
+    // Route away from combat screen based on phase
     if (campaign == null || !campaign.isInCombat) {
-      // Combat ended — pop back to exploration
-
-      if (campaign == null || !campaign.isInCombat) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          if (campaign?.phase == CampaignPhase.levelUp) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        switch (campaign?.phase) {
+          case CampaignPhase.combatVictory:
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const CombatVictoryScreen()),
+            );
+          case CampaignPhase.levelUp:
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (_) => const LevelUpScreen()),
             );
-          } else if (campaign?.phase == CampaignPhase.gameOver) {
+          case CampaignPhase.gameOver:
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(builder: (_) => const GameOverScreen()),
             );
-          } else {
+          default:
             Navigator.of(context).pop();
-          }
-        });
-        return const SizedBox.shrink();
-      }
+        }
+      });
       return const SizedBox.shrink();
     }
 

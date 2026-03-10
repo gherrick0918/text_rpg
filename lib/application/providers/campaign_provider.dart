@@ -42,9 +42,8 @@ final questRepositoryProvider = Provider<QuestRepository>((ref) {
 
 class CampaignNotifier extends Notifier<CampaignState?> {
   @override
-  CampaignState? build() => null; // null = no active campaign
+  CampaignState? build() => null;
 
-  // Start a new campaign
   void startCampaign({
     required String playerName,
     required CharacterStats stats,
@@ -52,7 +51,6 @@ class CampaignNotifier extends Notifier<CampaignState?> {
     ConflictType? selectedConflictType,
   }) {
     final player = Player(id: 'player_1', name: playerName, stats: stats);
-
     state = CampaignState(
       player: player,
       campaignLength: campaignLength,
@@ -62,14 +60,12 @@ class CampaignNotifier extends Notifier<CampaignState?> {
     );
   }
 
-  // Enter a room
   void enterRoom(Room room) {
     final current = state;
     if (current == null) return;
     state = current.enterRoom(room);
   }
 
-  // Begin a combat encounter
   void beginCombat(Enemy enemy) {
     final current = state;
     if (current == null) return;
@@ -90,63 +86,67 @@ class CampaignNotifier extends Notifier<CampaignState?> {
     final current = state;
     if (current == null || !current.isInCombat) return;
 
-    // Resolve player action
     var combat = action(current.activeCombat!);
 
-    // If combat not over, resolve enemy turn
     if (!combat.combatOver) {
       combat = CombatEngine.resolveEnemyTurn(combat);
     }
 
-    // If combat not over, begin next round
     if (!combat.combatOver) {
       combat = CombatEngine.beginNextRound(combat);
     }
 
-    // Update campaign state with combat result
     var updated = current.updateCombat(combat);
 
-    // Handle combat resolution
     if (combat.combatOver) {
       if (combat.playerWon) {
-        // Award XP and restore action points before returning to exploration.
-        // FIXED: was only calling gainExperience — currentActionPoints stayed
-        // depleted from the final combat round, showing e.g. 1/3 on the
-        // exploration screen after returning from combat.
-        final xp = current.activeCombat!.enemy.xpValue;
-        final updatedPlayer = current.player
-            .gainExperience(xp)
-            .refreshActionPoints();
-
-        updated = updated
-            .updatePlayer(updatedPlayer)
-            .endCombat()
-            .copyWith(phase: CampaignPhase.exploration);
-
-        // Check for level up
-        if (updatedPlayer.canLevelUp) {
-          updated = updated.copyWith(phase: CampaignPhase.levelUp);
-        }
-      } else if (!combat.playerWon &&
-          !current.activeCombat!.log.last.resultType.toString().contains(
-            'fled',
-          )) {
-        // Player died
-        updated = updated.copyWith(phase: CampaignPhase.gameOver);
+        // Park on combatVictory — keep activeCombat alive so the victory screen
+        // can read the enemy name, XP value, and final log entries.
+        // XP award and AP restore happen in acknowledgeVictory() when the
+        // player taps Continue, not here.
+        updated = updated.copyWith(phase: CampaignPhase.combatVictory);
       } else {
-        // Player fled — also restore AP so the player isn't punished
-        // resource-wise on the exploration screen after fleeing.
-        final restoredPlayer = current.player.refreshActionPoints();
-        updated = updated
-            .updatePlayer(restoredPlayer)
-            .endCombat();
+        final lastEntry = combat.log.isNotEmpty ? combat.log.last : null;
+        final playerFled = lastEntry?.resultType == CombatResultType.fled;
+
+        if (playerFled) {
+          // Restore AP after fleeing so the player isn't punished on return
+          final restoredPlayer = current.player.refreshActionPoints();
+          updated = updated.updatePlayer(restoredPlayer).endCombat();
+        } else {
+          updated = updated.copyWith(phase: CampaignPhase.gameOver);
+        }
       }
     }
 
     state = updated;
   }
 
-  // Level up — apply stat increase
+  /// Called by the victory screen's Continue button.
+  /// Awards XP, restores AP, clears combat, and advances to exploration
+  /// (or levelUp if the player earned enough XP).
+  void acknowledgeVictory() {
+    final current = state;
+    if (current == null || current.activeCombat == null) return;
+
+    final xp = current.activeCombat!.enemy.xpValue;
+    final updatedPlayer = current.player
+        .gainExperience(xp)
+        .refreshActionPoints();
+
+    var updated = current
+        .updatePlayer(updatedPlayer)
+        .endCombat()
+        .copyWith(phase: CampaignPhase.exploration);
+
+    if (updatedPlayer.canLevelUp) {
+      updated = updated.copyWith(phase: CampaignPhase.levelUp);
+    }
+
+    state = updated;
+  }
+
+  // Level up
   void levelUp(String statToIncrease) {
     final current = state;
     if (current == null) return;
@@ -188,7 +188,6 @@ class CampaignNotifier extends Notifier<CampaignState?> {
     }
   }
 
-  // Faction and conflict
   void adjustFactionReputation(String factionId, int amount) {
     final current = state;
     if (current == null) return;
@@ -258,13 +257,11 @@ class CampaignNotifier extends Notifier<CampaignState?> {
   }
 }
 
-// --- Campaign provider ---
+// --- Providers ---
 
 final campaignProvider = NotifierProvider<CampaignNotifier, CampaignState?>(() {
   return CampaignNotifier();
 });
-
-// --- Derived providers for UI convenience ---
 
 final playerProvider = Provider<Player?>((ref) {
   return ref.watch(campaignProvider)?.player;

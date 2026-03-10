@@ -193,6 +193,9 @@ void main() {
         safetyLimit--;
       }
 
+      // Acknowledge victory to complete XP award
+      container.read(campaignProvider.notifier).acknowledgeVictory();
+
       final state = container.read(campaignProvider);
       expect(state!.phase, isNot(equals(CampaignPhase.combat)));
       expect(state.player.experience, greaterThan(0));
@@ -216,6 +219,9 @@ void main() {
         container.read(campaignProvider.notifier).playerAttacks();
         safetyLimit--;
       }
+
+      // Acknowledge victory to complete XP award
+      container.read(campaignProvider.notifier).acknowledgeVictory();
 
       final state = container.read(campaignProvider);
       // Should have gained exactly the enemy's xpValue
@@ -300,6 +306,8 @@ void main() {
           container.read(campaignProvider.notifier).playerAttacks();
           safety--;
         }
+        // Acknowledge victory to complete XP award
+        container.read(campaignProvider.notifier).acknowledgeVictory();
       }
 
       final preState = container.read(campaignProvider);

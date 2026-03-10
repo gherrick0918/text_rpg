@@ -8,13 +8,14 @@ enum CampaignLength { short, medium, long }
 enum ConflictType { epic, political, social }
 
 enum CampaignPhase {
-  setup,       // Character creation, campaign selection
-  exploration, // Moving through rooms, triggering events
-  combat,      // Active combat encounter
-  dialogue,    // NPC interaction
-  levelUp,     // Player levelling up
-  gameOver,    // Combat loss
-  victory,     // Campaign complete
+  setup,        // Character creation, campaign selection
+  exploration,  // Moving through rooms, triggering events
+  combat,       // Active combat encounter
+  combatVictory, // Combat won — summary screen before returning to exploration
+  dialogue,     // NPC interaction
+  levelUp,      // Player levelling up
+  gameOver,     // Combat loss
+  victory,      // Campaign complete
 }
 
 class ConflictWeights {
@@ -36,7 +37,6 @@ class ConflictWeights {
     );
   }
 
-  // Returns the dominant conflict type based on current weights
   ConflictType get dominant {
     if (epic >= political && epic >= social) return ConflictType.epic;
     if (political >= epic && political >= social) return ConflictType.political;
@@ -80,7 +80,7 @@ class FactionReputation {
 class CampaignState {
   final Player player;
   final CampaignLength campaignLength;
-  final ConflictType? selectedConflictType; // null = emergent
+  final ConflictType? selectedConflictType;
   final ConflictWeights conflictWeights;
   final CampaignPhase phase;
   final Room? currentRoom;
@@ -110,7 +110,6 @@ class CampaignState {
     this.sessionTurn = 0,
   });
 
-  // The active conflict type — selected or emergent
   ConflictType get activeConflictType =>
       selectedConflictType ?? conflictWeights.dominant;
 
@@ -154,7 +153,6 @@ class CampaignState {
     );
   }
 
-  // Convenience state transitions
   CampaignState enterRoom(Room room) {
     final visited = visitedRoomIds.contains(room.id)
         ? visitedRoomIds
