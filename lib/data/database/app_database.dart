@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
@@ -189,10 +190,22 @@ class AppDatabase extends _$AppDatabase {
   int get schemaVersion => 1;
 }
 
+// ── FIXED: was creating a blank text_rpg.db with NativeDatabase.createInBackground
+// which never loaded the seeded content. Now copies content.db out of assets on
+// first launch, then opens it read-write for all subsequent launches.
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dbFolder.path, 'text_rpg.db'));
-    return NativeDatabase.createInBackground(file);
+    final file = File(p.join(dbFolder.path, 'content.db'));
+
+    if (!await file.exists()) {
+      // Copy the pre-seeded database out of the app bundle on first launch.
+      final blob = await rootBundle.load('assets/content.db');
+      await file.writeAsBytes(
+        blob.buffer.asUint8List(blob.offsetInBytes, blob.lengthInBytes),
+      );
+    }
+
+    return NativeDatabase(file);
   });
 }

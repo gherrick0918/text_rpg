@@ -28,14 +28,22 @@ class DriftRoomRepository implements RoomRepository {
 
     var candidates = all.where((row) {
       if (excludeIds.contains(row.id)) return false;
+
+      // ── REGION FILTER ───────────────────────────────────────────────────
+      // RoomTable stores region as a plain string column (not a JSON array),
+      // so we compare directly against row.region.
+      // FIXED: removed the dead jsonDecode(row.conflictTags) that was here
+      // previously — 'tags' was decoded from the wrong column and never used.
       if (regionTags != null && regionTags.isNotEmpty) {
-        final tags = List<String>.from(jsonDecode(row.conflictTags));
         if (!regionTags.any((t) => row.region == t)) return false;
       }
+
+      // ── CONFLICT TAG FILTER ─────────────────────────────────────────────
       if (conflictTags != null && conflictTags.isNotEmpty) {
         final tags = List<String>.from(jsonDecode(row.conflictTags));
         if (!conflictTags.any((t) => tags.contains(t))) return false;
       }
+
       return true;
     }).toList();
 
