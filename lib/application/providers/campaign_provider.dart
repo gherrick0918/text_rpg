@@ -6,9 +6,11 @@ import '../../domain/models/enemy.dart';
 import '../../domain/engine/combat_engine.dart';
 import '../../data/repositories/enemy_repository.dart';
 import '../../data/repositories/room_repository.dart';
+import '../../data/repositories/quest_repository.dart';
 import '../../data/database/app_database.dart';
 import '../../data/repositories/drift_enemy_repository.dart';
 import '../../data/repositories/drift_room_repository.dart';
+import '../../data/repositories/drift_quest_repository.dart';
 import '../state/campaign_state.dart';
 
 // --- Database provider ---
@@ -29,6 +31,11 @@ final roomRepositoryProvider = Provider<RoomRepository>((ref) {
 final enemyRepositoryProvider = Provider<EnemyRepository>((ref) {
   final db = ref.watch(databaseProvider);
   return DriftEnemyRepository(db);
+});
+
+final questRepositoryProvider = Provider<QuestRepository>((ref) {
+  final db = ref.watch(databaseProvider);
+  return DriftQuestRepository(db);
 });
 
 // --- Campaign notifier ---
@@ -102,9 +109,15 @@ class CampaignNotifier extends Notifier<CampaignState?> {
     // Handle combat resolution
     if (combat.combatOver) {
       if (combat.playerWon) {
-        // Award XP
+        // Award XP and restore action points before returning to exploration.
+        // FIXED: was only calling gainExperience — currentActionPoints stayed
+        // depleted from the final combat round, showing e.g. 1/3 on the
+        // exploration screen after returning from combat.
         final xp = current.activeCombat!.enemy.xpValue;
-        final updatedPlayer = current.player.gainExperience(xp);
+        final updatedPlayer = current.player
+            .gainExperience(xp)
+            .refreshActionPoints();
+
         updated = updated
             .updatePlayer(updatedPlayer)
             .endCombat()
@@ -121,8 +134,12 @@ class CampaignNotifier extends Notifier<CampaignState?> {
         // Player died
         updated = updated.copyWith(phase: CampaignPhase.gameOver);
       } else {
-        // Player fled
-        updated = updated.endCombat();
+        // Player fled — also restore AP so the player isn't punished
+        // resource-wise on the exploration screen after fleeing.
+        final restoredPlayer = current.player.refreshActionPoints();
+        updated = updated
+            .updatePlayer(restoredPlayer)
+            .endCombat();
       }
     }
 

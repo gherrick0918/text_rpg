@@ -12,6 +12,7 @@ import '../widgets/divider_ornament.dart';
 import 'combat_screen.dart';
 import 'level_up_screen.dart';
 import 'game_over_screen.dart';
+import 'quest_log_screen.dart';
 
 class ExplorationScreen extends ConsumerStatefulWidget {
   const ExplorationScreen({super.key});
@@ -194,6 +195,8 @@ class _ExplorationScreenState extends ConsumerState<ExplorationScreen> {
     WidgetRef ref,
     CampaignState campaign,
   ) {
+    final activeQuestCount = campaign.activeQuestIds.length;
+
     return ParchmentPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,6 +211,40 @@ class _ExplorationScreenState extends ConsumerState<ExplorationScreen> {
           ActionButton(
             label: 'ENGAGE ENEMY',
             onPressed: () => _onEngageEnemy(context, ref),
+          ),
+          const SizedBox(height: 8),
+          // Quest log button — shows a badge if there are active quests
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              ActionButton(
+                label: 'QUEST LOG',
+                onPressed: () => _onQuestLog(context),
+              ),
+              if (activeQuestCount > 0)
+                Positioned(
+                  top: -6,
+                  right: -6,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(
+                      color: AppColors.gold,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$activeQuestCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 8),
           ActionButton(
@@ -237,6 +274,12 @@ class _ExplorationScreenState extends ConsumerState<ExplorationScreen> {
         context,
       ).push(MaterialPageRoute(builder: (_) => const CombatScreen()));
     }
+  }
+
+  void _onQuestLog(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const QuestLogScreen()));
   }
 
   void _onCharacterSheet(BuildContext context, CampaignState campaign) {
