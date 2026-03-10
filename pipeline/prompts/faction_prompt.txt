@@ -1,0 +1,26 @@
+You are a content generator for a medieval fantasy text RPG.
+
+Generate {{count}} faction records as a JSON array. Each faction must strictly follow this schema:
+
+{
+  "id": "faction_XXX (unique, sequential)",
+  "name": "string (distinctive faction name)",
+  "archetype": one of "military" | "religious" | "criminal" | "noble" | "merchant" | "rebel" | "arcane" | "civic",
+  "description": "string (3 sentences describing who they are and what they represent)",
+  "agenda": "string (1-2 sentences on what they ultimately want)",
+  "methods": "string (1-2 sentences on how they pursue their agenda)",
+  "leaderNpcId": null,
+  "keyMembers": [],
+  "homeRegion": one of "wilderness" | "dungeon" | "town" | "ruins",
+  "alliedFactions": [],
+  "rivalFactions": [],
+  "playerReputationStart": 0,
+  "conflictTags": array containing one or more of "epic" | "political" | "social",
+  "campaignLengthMinimum": one of "short" | "medium" | "long"
+}
+
+Tone: gritty, atmospheric, classic fantasy. Factions should feel like real organizations with genuine agendas and internal politics.
+Variety guidance: mix archetypes and conflict tags. Political factions should feel different from military ones. Criminal factions should feel opportunistic not cartoonish.
+Note: leaderNpcId and keyMembers left empty — these will be populated separately.
+
+Return ONLY the JSON array. No preamble, no explanation, no markdown code fences.

@@ -1,0 +1,33 @@
+You are a content generator for a medieval fantasy text RPG.
+
+Generate {{count}} quest records as a JSON array. Each quest must strictly follow this schema:
+
+{
+  "id": "quest_XXX (unique, sequential)",
+  "title": "string (clear quest title)",
+  "parentArc": null,
+  "questType": one of "main" | "side" | "faction" | "dynamic",
+  "description": "string (2-3 sentences of what the player is asked to do and why it matters)",
+  "giverNpcId": null,
+  "objectives": [
+    {
+      "description": "string (clear objective text)",
+      "type": one of "kill" | "retrieve" | "escort" | "discover" | "persuade" | "reach"
+    }
+  ],
+  "rewards": {
+    "xp": integer (side: 50-150, faction: 100-200, main: 200-400),
+    "gold": integer (10-100 scaling with difficulty),
+    "items": [],
+    "reputation": {}
+  },
+  "conflictWeight": {"epic": integer 0-3, "political": integer 0-3, "social": integer 0-3},
+  "conflictTags": array containing one or more of "epic" | "political" | "social",
+  "campaignLengthMinimum": one of "short" | "medium" | "long"
+}
+
+Tone: gritty, atmospheric, classic fantasy. Quests should feel grounded and morally interesting.
+Variety guidance: mix quest types and conflict tags broadly. Not every quest is kill-and-retrieve. Include investigation, diplomacy, and exploration objectives.
+Conflict weight guidance: reflects how completing this quest nudges the campaign. Values 0-3 per type, usually only 1-2 types have non-zero weight.
+
+Return ONLY the JSON array. No preamble, no explanation, no markdown code fences.

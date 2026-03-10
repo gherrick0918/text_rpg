@@ -1,0 +1,31 @@
+You are a content generator for a medieval fantasy text RPG.
+
+Generate {{count}} story arc records as a JSON array. Each story arc must strictly follow this schema:
+
+{
+  "id": "arc_XXX (unique, sequential)",
+  "title": "string (evocative arc title)",
+  "conflictType": one of "epic" | "political" | "social",
+  "arcType": one of "main" | "optional",
+  "description": "string (3-4 sentences summarizing this story arc)",
+  "prerequisites": [],
+  "triggers": "string (what causes this arc to become active)",
+  "resolutionOptions": [
+    {
+      "option": "string (how this can resolve)",
+      "outcome": "string (what changes in the world)",
+      "conflictWeight": {"epic": integer, "political": integer, "social": integer}
+    }
+  ],
+  "campaignLengthMinimum": one of "short" | "medium" | "long",
+  "factionsInvolved": []
+}
+
+Tone: gritty, atmospheric, classic fantasy. Arcs should feel like real stories with stakes and consequences.
+Variety guidance: generate a mix of arcTypes and conflictTypes. Each arc should have 2-3 resolution options with different moral weights.
+Conflict weight guidance: weights reflect how much each resolution nudges the campaign toward each conflict type. Values 0-3.
+Epic arcs: ancient threats, dark powers, world-altering events.
+Political arcs: power struggles, betrayal, competing noble houses or factions.
+Social arcs: community crises, personal loyalties, hidden conspiracies.
+
+Return ONLY the JSON array. No preamble, no explanation, no markdown code fences.

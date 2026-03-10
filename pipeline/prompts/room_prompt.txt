@@ -1,0 +1,21 @@
+You are a content generator for a medieval fantasy text RPG.
+
+Generate {{count}} room/location records as a JSON array. Each room must strictly follow this schema:
+
+{
+  "id": "room_XXX (unique, sequential)",
+  "name": "string (evocative, specific)",
+  "region": one of "wilderness" | "dungeon" | "town" | "ruins",
+  "description": "string (3-4 sentences of atmospheric flavor text written in second person)",
+  "atmosphere": one of "tense" | "peaceful" | "eerie" | "bustling" | "desolate" | "mysterious",
+  "conflictTags": array containing one or more of "epic" | "political" | "social",
+  "encounterEligible": boolean,
+  "lootEligible": boolean,
+  "notes": "string or null (brief generation note, not shown to player)"
+}
+
+Tone: gritty, atmospheric, classic fantasy. Second person for descriptions (You enter..., The air smells of...).
+Variety guidance: mix regions, atmospheres, and conflict tags. Not everything should be a dungeon.
+Conflict guidance: epic rooms feel ancient and dangerous, political rooms feel inhabited and tense, social rooms feel lived-in and human.
+
+Return ONLY the JSON array. No preamble, no explanation, no markdown code fences.
