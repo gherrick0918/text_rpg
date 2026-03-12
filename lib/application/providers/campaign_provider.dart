@@ -12,6 +12,7 @@ import '../../data/repositories/drift_enemy_repository.dart';
 import '../../data/repositories/drift_room_repository.dart';
 import '../../data/repositories/drift_quest_repository.dart';
 import '../state/campaign_state.dart';
+import '../../core/logger/run_logger.dart';
 
 // --- Database provider ---
 
@@ -50,6 +51,12 @@ class CampaignNotifier extends Notifier<CampaignState?> {
     required CampaignLength campaignLength,
     ConflictType? selectedConflictType,
   }) {
+    RunLogger.info('CampaignProvider', 
+      'Starting new campaign: player="$playerName", campaign=${campaignLength.name}, '
+      'conflict=${selectedConflictType?.name ?? "none"}, stats=[Str:${stats.strength} '
+      'Sta:${stats.stamina} Agi:${stats.agility} Luk:${stats.luck} Cha:${stats.charisma} '
+      'Wis:${stats.wisdom} Int:${stats.intelligence}]');
+    
     final player = Player(id: 'player_1', name: playerName, stats: stats);
     state = CampaignState(
       player: player,
@@ -58,17 +65,35 @@ class CampaignNotifier extends Notifier<CampaignState?> {
       phase: CampaignPhase.exploration,
       gold: 10,
     );
+    
+    RunLogger.info('CampaignProvider', 'Campaign initialized → exploration phase');
   }
 
   void enterRoom(Room room) {
     final current = state;
-    if (current == null) return;
+    if (current == null) {
+      RunLogger.warn('CampaignProvider', 'enterRoom called with no active campaign');
+      return;
+    }
+    
+    RunLogger.info('CampaignProvider', 
+      'Entering room: "${room.name}" (${room.region}) - Turn ${current.sessionTurn + 1}');
+    
     state = current.enterRoom(room);
   }
 
   void beginCombat(Enemy enemy) {
     final current = state;
-    if (current == null) return;
+    if (current == null) {
+      RunLogger.warn('CampaignProvider', 'beginCombat called with no active campaign');
+      return;
+    }
+    
+    RunLogger.info('CampaignProvider', 
+      'Combat initiated: Player(L${current.player.level} ${current.player.currentHealth}HP '
+      '${current.player.currentActionPoints}AP) vs "${enemy.name}" '
+      '(T${enemy.tier} ${enemy.currentHealth}HP ${enemy.armorValue}AC)');
+    
     final combatState = CombatEngine.beginCombat(
       player: current.player,
       enemy: enemy,
@@ -100,6 +125,9 @@ class CampaignNotifier extends Notifier<CampaignState?> {
 
     if (combat.combatOver) {
       if (combat.playerWon) {
+        RunLogger.info('CampaignProvider', 
+          'Combat victory: Player defeated "${combat.enemy.name}" '
+          '(${combat.enemy.xpValue} XP pending) after ${combat.round} round(s)');
         // Park on combatVictory — keep activeCombat alive so the victory screen
         // can read the enemy name, XP value, and final log entries.
         // XP award and AP restore happen in acknowledgeVictory() when the
@@ -110,10 +138,14 @@ class CampaignNotifier extends Notifier<CampaignState?> {
         final playerFled = lastEntry?.resultType == CombatResultType.fled;
 
         if (playerFled) {
+          RunLogger.info('CampaignProvider', 
+            'Player fled from "${combat.enemy.name}" - AP restored');
           // Restore AP after fleeing so the player isn't punished on return
           final restoredPlayer = current.player.refreshActionPoints();
           updated = updated.updatePlayer(restoredPlayer).endCombat();
         } else {
+          RunLogger.info('CampaignProvider', 
+            'Player defeated by "${combat.enemy.name}" after ${combat.round} round(s) → game over');
           updated = updated.copyWith(phase: CampaignPhase.gameOver);
         }
       }
@@ -127,9 +159,18 @@ class CampaignNotifier extends Notifier<CampaignState?> {
   /// (or levelUp if the player earned enough XP).
   void acknowledgeVictory() {
     final current = state;
-    if (current == null || current.activeCombat == null) return;
+    if (current == null || current.activeCombat == null) {
+      RunLogger.warn('CampaignProvider', 'acknowledgeVictory called with no active combat');
+      return;
+    }
 
     final xp = current.activeCombat!.enemy.xpValue;
+    final oldXP = current.player.experience;
+    final oldLevel = current.player.level;
+    
+    RunLogger.info('CampaignProvider', 
+      'Victory acknowledged: Awarding ${xp} XP (${oldXP} → ${oldXP + xp})');
+    
     final updatedPlayer = current.player
         .gainExperience(xp)
         .refreshActionPoints();
@@ -140,6 +181,8 @@ class CampaignNotifier extends Notifier<CampaignState?> {
         .copyWith(phase: CampaignPhase.exploration);
 
     if (updatedPlayer.canLevelUp) {
+      RunLogger.info('CampaignProvider', 
+        'Level up available: L${oldLevel} → L${updatedPlayer.level + 1}');
       updated = updated.copyWith(phase: CampaignPhase.levelUp);
     }
 
@@ -149,10 +192,19 @@ class CampaignNotifier extends Notifier<CampaignState?> {
   // Level up
   void levelUp(String statToIncrease) {
     final current = state;
-    if (current == null) return;
+    if (current == null) {
+      RunLogger.warn('CampaignProvider', 'levelUp called with no active campaign');
+      return;
+    }
 
+    final oldLevel = current.player.level;
     final stats = current.player.stats;
     final updatedStats = _incrementStat(stats, statToIncrease);
+    
+    RunLogger.info('CampaignProvider', 
+      'Level up: L${oldLevel} → L${oldLevel + 1}, increased $statToIncrease '
+      '(${_getStatValue(stats, statToIncrease)} → ${_getStatValue(updatedStats, statToIncrease)})');
+    
     final updatedPlayer = current.player.copyWith(
       stats: updatedStats,
       level: current.player.level + 1,
@@ -187,6 +239,19 @@ class CampaignNotifier extends Notifier<CampaignState?> {
         return stats;
     }
   }
+  
+  int _getStatValue(CharacterStats stats, String stat) {
+    switch (stat) {
+      case 'strength': return stats.strength;
+      case 'stamina': return stats.stamina;
+      case 'agility': return stats.agility;
+      case 'luck': return stats.luck;
+      case 'charisma': return stats.charisma;
+      case 'wisdom': return stats.wisdom;
+      case 'intelligence': return stats.intelligence;
+      default: return 0;
+    }
+  }
 
   void adjustFactionReputation(String factionId, int amount) {
     final current = state;
@@ -218,7 +283,14 @@ class CampaignNotifier extends Notifier<CampaignState?> {
 
   Future<void> exploreRoom() async {
     final current = state;
-    if (current == null) return;
+    if (current == null) {
+      RunLogger.warn('CampaignProvider', 'exploreRoom called with no active campaign');
+      return;
+    }
+
+    RunLogger.info('CampaignProvider', 
+      'Exploring room: conflict=${current.activeConflictType.name}, '
+      'visited=${current.visitedRoomIds.length} rooms');
 
     final roomRepo = ref.read(roomRepositoryProvider);
     final room = await roomRepo.getRandomRoom(
@@ -226,7 +298,14 @@ class CampaignNotifier extends Notifier<CampaignState?> {
       excludeIds: current.visitedRoomIds,
     );
 
-    if (room == null) return;
+    if (room == null) {
+      RunLogger.warn('CampaignProvider', 'No room found matching exploration criteria');
+      return;
+    }
+
+    RunLogger.info('CampaignProvider', 
+      'Room selected: "${room.name}" (${room.region}) - '
+      'eligible: encounter=${room.encounterEligible}, loot=${room.lootEligible}');
 
     state = current.copyWith(
       currentRoom: room,
@@ -237,17 +316,35 @@ class CampaignNotifier extends Notifier<CampaignState?> {
 
   Future<Enemy?> spawnEnemy() async {
     final current = state;
-    if (current == null) return null;
+    if (current == null) {
+      RunLogger.warn('CampaignProvider', 'spawnEnemy called with no active campaign');
+      return null;
+    }
 
     final enemyRepo = ref.read(enemyRepositoryProvider);
     final tier = _tierForLevel(current.player.level);
     final regionTag = current.currentRoom?.region ?? 'wilderness';
 
-    return enemyRepo.getRandomEnemy(
+    RunLogger.info('CampaignProvider', 
+      'Spawning enemy: player_level=${current.player.level} → tier=$tier, '
+      'region=$regionTag, conflict=${current.activeConflictType.name}');
+
+    final enemy = await enemyRepo.getRandomEnemy(
       tier: tier,
       regionTags: [regionTag],
       conflictTags: [current.activeConflictType.name],
     );
+    
+    if (enemy == null) {
+      RunLogger.warn('CampaignProvider', 
+        'No enemy found matching spawn criteria (tier=$tier, region=$regionTag)');
+    } else {
+      RunLogger.info('CampaignProvider', 
+        'Enemy spawned: "${enemy.name}" (T${enemy.tier} ${enemy.currentHealth}HP '
+        '${enemy.armorValue}AC ${enemy.behavior.name})');
+    }
+
+    return enemy;
   }
 
   int _tierForLevel(int level) {

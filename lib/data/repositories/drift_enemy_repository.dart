@@ -4,6 +4,7 @@ import '../../domain/models/enemy.dart';
 import '../../domain/models/character_stats.dart';
 import 'enemy_repository.dart';
 import '../database/app_database.dart';
+import '../../core/logger/run_logger.dart';
 
 class DriftEnemyRepository implements EnemyRepository {
   final AppDatabase _db;
@@ -25,7 +26,12 @@ class DriftEnemyRepository implements EnemyRepository {
     List<String>? regionTags,
     List<String>? conflictTags,
   }) async {
+    RunLogger.info('EnemyRepository', 
+      'Querying random enemy: tier=${tier ?? "any"}, '
+      'regions=${regionTags ?? "any"}, conflicts=${conflictTags ?? "any"}');
+    
     final all = await (_db.select(_db.enemyTable)).get();
+    RunLogger.info('EnemyRepository', 'Total enemies in database: ${all.length}');
 
     var candidates = all.where((row) {
       if (tier != null && row.tier != tier) return false;
@@ -40,8 +46,11 @@ class DriftEnemyRepository implements EnemyRepository {
       return true;
     }).toList();
 
+    RunLogger.info('EnemyRepository', 'Enemies after filtering: ${candidates.length}');
+
     // Relax tier constraint if needed
     if (candidates.isEmpty && tier != null) {
+      RunLogger.warn('EnemyRepository', 'No tier $tier enemies found - relaxing tier constraint');
       candidates = all.where((row) {
         if (regionTags != null && regionTags.isNotEmpty) {
           final tags = List<String>.from(jsonDecode(row.regionTags));
@@ -49,13 +58,26 @@ class DriftEnemyRepository implements EnemyRepository {
         }
         return true;
       }).toList();
+      RunLogger.info('EnemyRepository', 'Enemies after relaxing tier: ${candidates.length}');
     }
 
-    if (candidates.isEmpty) candidates = all;
-    if (candidates.isEmpty) return null;
+    if (candidates.isEmpty) {
+      RunLogger.warn('EnemyRepository', 'No matching enemies - using any available enemy');
+      candidates = all;
+    }
+    if (candidates.isEmpty) {
+      RunLogger.error('EnemyRepository', 'No enemies available in database!');
+      return null;
+    }
 
     candidates.shuffle(_random);
-    return _fromRow(candidates.first);
+    final selected = _fromRow(candidates.first);
+    
+    RunLogger.info('EnemyRepository', 
+      'Enemy selected: "${selected.name}" (T${selected.tier} ${selected.currentHealth}HP '
+      '${selected.armorValue}AC ${selected.behavior.name})');
+    
+    return selected;
   }
 
   @override

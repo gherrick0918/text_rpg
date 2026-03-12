@@ -1,9 +1,9 @@
 import '../models/player.dart';
 import '../models/enemy.dart';
-import '../models/character_stats.dart';
 import 'dice.dart';
 import 'check_system.dart';
 import 'luck_system.dart';
+import '../../core/logger/run_logger.dart';
 
 enum CombatActionType {
   attack,
@@ -109,6 +109,11 @@ class CombatEngine {
     required Player player,
     required Enemy enemy,
   }) {
+    RunLogger.info('CombatEngine', 
+      'Combat begins: "${player.name}" (L${player.level} ${player.currentHealth}/${player.stats.maxHealth}HP '
+      '${player.currentActionPoints}AP) vs "${enemy.name}" (T${enemy.tier} '
+      '${enemy.currentHealth}/${enemy.stats.maxHealth}HP ${enemy.currentActionPoints}AP)');
+    
     return CombatState(
       player: player.refreshActionPoints(),
       enemy: enemy.refreshActionPoints(),
@@ -118,6 +123,10 @@ class CombatEngine {
   }
 
   static CombatState beginNextRound(CombatState state) {
+    RunLogger.info('CombatEngine', 
+      'Round ${state.round + 1} begins: Player(${state.player.currentHealth}HP) '
+      'vs "${state.enemy.name}"(${state.enemy.currentHealth}HP) - AP refreshed');
+    
     return state.copyWith(
       player: state.player.refreshActionPoints(),
       enemy: state.enemy.refreshActionPoints(),
@@ -131,24 +140,36 @@ class CombatEngine {
 
   static CombatState playerAttacks(CombatState state) {
     if (state.player.currentActionPoints < attackCost) {
+      RunLogger.warn('CombatEngine', 
+        'Attack blocked: insufficient AP (${state.player.currentActionPoints}/$attackCost)');
       return state; // Not enough AP — engine silently ignores
     }
 
     final player = state.player.spendActionPoints(attackCost);
+    final targetNumber = _hitTarget(state.enemy);
+
+    RunLogger.info('CombatEngine', 
+      'Player attacks: ${attackCost}AP spent (${state.player.currentActionPoints} → ${player.currentActionPoints}), '
+      'target=$targetNumber');
 
     // Roll to hit
     final hitCheck = CheckSystem.resolve(
       attribute: CheckAttribute.strength,
       stats: player.stats,
-      targetNumber: _hitTarget(state.enemy),
+      targetNumber: targetNumber,
     );
 
     if (!hitCheck.isSuccess) {
+      final resultType = hitCheck.outcome == CheckOutcome.criticalFailure
+          ? CombatResultType.criticalMiss
+          : CombatResultType.miss;
+      
+      RunLogger.info('CombatEngine', 
+        'Attack missed: roll=${hitCheck.finalTotal} vs $targetNumber, outcome=${hitCheck.outcome.name}');
+      
       final result = CombatActionResult(
         actionType: CombatActionType.attack,
-        resultType: hitCheck.outcome == CheckOutcome.criticalFailure
-            ? CombatResultType.criticalMiss
-            : CombatResultType.miss,
+        resultType: resultType,
         damageDealt: 0,
         actionPointCost: attackCost,
         luckResult: hitCheck.luckResult,
@@ -162,12 +183,19 @@ class CombatEngine {
     final luckResult = LuckSystem.resolve(player.stats.luck);
     damage += luckResult.modifier;
     damage = damage.clamp(1, 999);
+    
+    final baseDamage = damage;
 
     // Apply armor and defense reduction
     damage = _applyDefenseReduction(damage, state.enemy.armorValue, state.enemyDefending);
 
     final isCrit = hitCheck.outcome == CheckOutcome.criticalSuccess;
     if (isCrit) damage = (damage * 1.5).round();
+
+    RunLogger.info('CombatEngine', 
+      'Attack hit: roll=${hitCheck.finalTotal} vs $targetNumber, '
+      'base_damage=$baseDamage luck=${luckResult.modifier} '
+      'armor_reduced=$damage crit=$isCrit final=$damage');
 
     final updatedEnemy = state.enemy.takeDamage(damage);
 
@@ -187,6 +215,8 @@ class CombatEngine {
 
     // Check if enemy is defeated
     if (!updatedEnemy.isAlive) {
+      RunLogger.info('CombatEngine', 
+        'Enemy "${state.enemy.name}" defeated! ($damage damage reduced ${state.enemy.currentHealth} → 0)');
       return loggedState.copyWith(combatOver: true, playerWon: true);
     }
 

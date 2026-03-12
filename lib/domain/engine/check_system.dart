@@ -1,6 +1,7 @@
 import '../models/character_stats.dart';
 import 'dice.dart';
 import 'luck_system.dart';
+import '../../core/logger/run_logger.dart';
 
 enum CheckAttribute {
   strength,
@@ -65,6 +66,10 @@ class CheckSystem {
 
     final outcome = _determineOutcome(rawRoll, finalTotal, targetNumber);
 
+    RunLogger.info('CheckSystem', 
+      '${attribute.name} check: d20=$rawRoll + stat=$statBonus + luck=${luckResult.modifier} '
+      '= $finalTotal vs $targetNumber → ${outcome.name}');
+
     return CheckResult(
       rawRoll: rawRoll,
       statBonus: statBonus,
@@ -86,6 +91,9 @@ class CheckSystem {
     final opposingRoll = Dice.d20();
     final opposingBonus = _getBonusForAttribute(attribute, opposingStats);
     final targetNumber = opposingRoll + opposingBonus;
+    
+    RunLogger.info('CheckSystem', 
+      'Opposed ${attribute.name} check: opponent rolled d20=$opposingRoll + $opposingBonus = $targetNumber');
 
     return resolve(
       attribute: attribute,

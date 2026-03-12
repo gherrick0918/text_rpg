@@ -13,6 +13,7 @@ import 'combat_screen.dart';
 import 'level_up_screen.dart';
 import 'game_over_screen.dart';
 import 'quest_log_screen.dart';
+import '../../core/logger/run_logger.dart';
 
 class ExplorationScreen extends ConsumerStatefulWidget {
   const ExplorationScreen({super.key});
@@ -257,19 +258,25 @@ class _ExplorationScreenState extends ConsumerState<ExplorationScreen> {
   }
 
   void _onExplore(BuildContext context, WidgetRef ref) async {
+    RunLogger.info('ExplorationScreen', 'User action: Explore Room');
     await ref.read(campaignProvider.notifier).exploreRoom();
   }
 
   void _onEngageEnemy(BuildContext context, WidgetRef ref) async {
+    RunLogger.info('ExplorationScreen', 'User action: Engage Enemy');
+    
     final enemy = await ref.read(campaignProvider.notifier).spawnEnemy();
     if (enemy == null) {
+      RunLogger.warn('ExplorationScreen', 'No enemy spawned - showing user notification');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No enemies found in this region.')),
       );
       return;
     }
+    
     ref.read(campaignProvider.notifier).beginCombat(enemy);
     if (context.mounted) {
+      RunLogger.info('ExplorationScreen', 'Navigation: ExplorationScreen → CombatScreen');
       Navigator.of(
         context,
       ).push(MaterialPageRoute(builder: (_) => const CombatScreen()));
@@ -277,6 +284,7 @@ class _ExplorationScreenState extends ConsumerState<ExplorationScreen> {
   }
 
   void _onQuestLog(BuildContext context) {
+    RunLogger.info('ExplorationScreen', 'Navigation: ExplorationScreen → QuestLogScreen');
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const QuestLogScreen()));

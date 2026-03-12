@@ -8,6 +8,7 @@ import '../widgets/parchment_panel.dart';
 import '../widgets/action_button.dart';
 import '../widgets/divider_ornament.dart';
 import 'exploration_screen.dart';
+import '../../core/logger/run_logger.dart';
 
 class StartScreen extends ConsumerStatefulWidget {
   const StartScreen({super.key});
@@ -55,7 +56,15 @@ class _StartScreenState extends ConsumerState<StartScreen> {
 
   void _startCampaign() {
     final name = _nameController.text.trim();
-    if (name.isEmpty) return;
+    if (name.isEmpty) {
+      RunLogger.warn('StartScreen', 'Campaign start blocked: empty player name');
+      return;
+    }
+
+    RunLogger.info('StartScreen', 
+        'Starting campaign: name="$name", length=${_selectedLength.name}, '
+        'conflict=${_selectedConflict?.name ?? "emergent"}, '
+        'stats=[$_spentPoints/$_totalPoints pts]');
 
     ref.read(campaignProvider.notifier).startCampaign(
           playerName: name,
@@ -72,6 +81,7 @@ class _StartScreenState extends ConsumerState<StartScreen> {
           selectedConflictType: _selectedConflict,
         );
 
+    RunLogger.info('StartScreen', 'Navigation: StartScreen → ExplorationScreen');
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const ExplorationScreen()),
     );

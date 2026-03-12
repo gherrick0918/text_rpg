@@ -3,6 +3,7 @@ import 'dart:math';
 import '../../domain/models/room.dart';
 import 'room_repository.dart';
 import '../database/app_database.dart';
+import '../../core/logger/run_logger.dart';
 
 class DriftRoomRepository implements RoomRepository {
   final AppDatabase _db;
@@ -12,10 +13,20 @@ class DriftRoomRepository implements RoomRepository {
 
   @override
   Future<Room?> getRoomById(String id) async {
+    RunLogger.info('RoomRepository', 'Querying room by ID: $id');
+    
     final row = await (_db.select(_db.roomTable)
           ..where((t) => t.id.equals(id)))
         .getSingleOrNull();
-    return row == null ? null : _fromRow(row);
+    
+    if (row == null) {
+      RunLogger.warn('RoomRepository', 'Room not found with ID: $id');
+      return null;
+    }
+    
+    final room = _fromRow(row);
+    RunLogger.info('RoomRepository', 'Room found: "${room.name}" (${room.region})');
+    return room;
   }
 
   @override
@@ -24,7 +35,12 @@ class DriftRoomRepository implements RoomRepository {
     List<String>? conflictTags,
     List<String> excludeIds = const [],
   }) async {
+    RunLogger.info('RoomRepository', 
+      'Querying random room: regions=${regionTags ?? "any"}, '
+      'conflicts=${conflictTags ?? "any"}, excluding ${excludeIds.length} rooms');
+    
     final all = await (_db.select(_db.roomTable)).get();
+    RunLogger.info('RoomRepository', 'Total rooms in database: ${all.length}');
 
     var candidates = all.where((row) {
       if (excludeIds.contains(row.id)) return false;
@@ -47,18 +63,32 @@ class DriftRoomRepository implements RoomRepository {
       return true;
     }).toList();
 
+    RunLogger.info('RoomRepository', 'Rooms after filtering: ${candidates.length}');
+
     // Fall back to any unvisited room if filters yield nothing
     if (candidates.isEmpty) {
+      RunLogger.warn('RoomRepository', 'No rooms matched filters - trying unvisited rooms');
       candidates = all.where((row) => !excludeIds.contains(row.id)).toList();
+      RunLogger.info('RoomRepository', 'Unvisited rooms available: ${candidates.length}');
     }
     // Fall back to any room at all
     if (candidates.isEmpty && all.isNotEmpty) {
+      RunLogger.warn('RoomRepository', 'All rooms visited - using any available room');
       candidates = all;
     }
-    if (candidates.isEmpty) return null;
+    if (candidates.isEmpty) {
+      RunLogger.error('RoomRepository', 'No rooms available in database!');
+      return null;
+    }
 
     candidates.shuffle(_random);
-    return _fromRow(candidates.first);
+    final selected = _fromRow(candidates.first);
+    
+    RunLogger.info('RoomRepository', 
+      'Room selected: "${selected.name}" (${selected.region}) - '
+      'encounter=${selected.encounterEligible}, loot=${selected.lootEligible}');
+    
+    return selected;
   }
 
   @override

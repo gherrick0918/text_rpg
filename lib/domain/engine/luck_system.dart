@@ -1,4 +1,5 @@
 import 'dice.dart';
+import '../../core/logger/run_logger.dart';
 
 enum LuckModifierType { positive, negative, none }
 
@@ -24,16 +25,23 @@ class LuckSystem {
     final triggerChance = (luckScore * _triggerMultiplier).round().clamp(5, 95);
 
     if (!Dice.percentageCheck(triggerChance)) {
+      RunLogger.info('LuckSystem', 
+        'Luck $luckScore: ${triggerChance}% trigger chance failed → no modifier');
       return LuckResult.none;
     }
 
     // Luck triggered — determine direction and magnitude
     final magnitude = _calculateMagnitude(luckScore);
     final type = _determineDirection(luckScore);
+    final modifier = type == LuckModifierType.positive ? magnitude : -magnitude;
+
+    RunLogger.info('LuckSystem', 
+      'Luck $luckScore: triggered (${triggerChance}%) → ${type.name} ${modifier.abs()} '
+      '(=${modifier > 0 ? "+" : ""}$modifier)');
 
     return LuckResult(
       type: type,
-      modifier: type == LuckModifierType.positive ? magnitude : -magnitude,
+      modifier: modifier,
     );
   }
 
