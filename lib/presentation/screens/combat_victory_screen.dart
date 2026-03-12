@@ -16,15 +16,16 @@ class CombatVictoryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final campaign = ref.watch(campaignProvider);
 
-    // Guard — should always have activeCombat here, but be safe
+    // Guard — activeCombat should always be present here.
+    // Do NOT navigate from this guard — ref.listen below owns all navigation.
+    // Two simultaneous navigation calls (guard + listen) both posting to the
+    // same frame callback would double-pop and black out the exploration screen.
     if (campaign == null || campaign.activeCombat == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) Navigator.of(context).pop();
-      });
       return const SizedBox.shrink();
     }
 
-    // Watch for phase change away from combatVictory (after Continue is tapped)
+    // Watch for phase change away from combatVictory (after Continue is tapped).
+    // This is the single source of navigation out of this screen.
     ref.listen<CampaignState?>(campaignProvider, (previous, next) {
       if (next == null) return;
       if (next.phase == CampaignPhase.levelUp) {
